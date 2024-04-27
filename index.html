@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css">
+    <title>Messenger</title>
+
+    <style>
+        body {
+            background: #1D1D1D; 
+            color: #CCCCCC; 
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Скрываем все содержимое, выходящее за границы экрана */
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        img {
+            position: absolute;
+            z-index: -1;
+            max-width: 50px; /* Ограничиваем максимальный размер изображений */
+            max-height: 50px; /* Ограничиваем максимальный размер изображений */
+            object-fit: cover;
+        }
+
+        .navbar {
+            display: none;
+        }
+
+        #messForm, #all_mess {
+            background: #2A2A2A; 
+            border: 2px solid #3A3A3A; 
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            height: 50vh; /* Уменьшаем высоту блоков */
+            overflow-y: auto; /* Добавляем возможность прокрутки */
+        }
+
+        .btn-danger {
+            background-color: #837e7f !important; 
+            border-color: #8c8c8c !important; 
+            color: #CCCCCC; 
+        }
+
+        #toggleThemeButton {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+
+        #onlineUsers {
+            text-align: center;
+        }
+
+        #all_mess, #messForm {
+            width: 70vh; /* Устанавливаем одинаковую ширину для обоих блоков */
+            height: 50vh;
+        }
+
+        .row {
+            width: 100%; /* Ширина ряда равна ширине экрана */
+            display: flex; /* Располагаем элементы ряда в строку */
+            justify-content: space-between; /* Распределяем элементы ряда по краям */
+        }
+
+        .form-control {
+            background-color: #2A2A2A;
+            color: #CCCCCC;
+            border: 1px solid #3A3A3A;
+            border-radius: 5px;
+            resize: none;
+        }
+
+        .btn-danger {
+            background-color: #837e7f !important;
+            border-color: #8c8c8c !important;
+            color: #CCCCCC;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-5px); 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button id="toggleThemeButton" class="btn btn-outline-light">Сменить тему</button>
+        <div class="py-5 text-center">
+            <h2>Messenger for pet owners</h2>
+            <p class="lead" id="onlineUsers">Online users: <span id="userCount">0</span></p>
+        </div>
+        <div class="row">
+            <div class="col">
+                <h3>Начните общение тут</h3>
+                <form id="messForm">
+                    <label for="name">Имя</label>
+                    <input type="text" name="name" id="name" placeholder="Введите имя" class="form-control">
+                    <br>
+                    <label for="message">Сообщение</label>
+                    <textarea name="message" id="message" class="form-control" placeholder="Введите сообщение"></textarea>
+                    <br>
+                    <input type="submit" value="Отправить" class="btn btn-danger">
+                </form>
+            </div>
+            <div class="col">
+                <h3>Сообщения</h3>
+                <div id="all_mess"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        var currentTheme = 'dark';
+        // Массив с данными об изображениях
+        var images = [
+            { path: 'lapacat.png', width: 100, height: 'auto' },
+            // Добавьте другие изображения
+        ];
+
+        // Функция для генерации случайного числа в диапазоне
+        function getRandomNumber(min, max) {
+            return Math.floor(Math.random() * (max - min)) + min;
+        }
+
+        // Функция для выбора случайного изображения из массива
+        function getRandomImage() {
+            return images[getRandomNumber(0, images.length)];
+        }
+
+        // Функция для генерации случайных стилей для изображения
+        function getRandomStyles() {
+            var top = getRandomNumber(0, $(window).height()); // Случайное значение для top
+            var left = getRandomNumber(0, $(window).width()); // Случайное значение для left
+            var size = getRandomNumber(50, 200); // Случайный размер изображения
+
+            return {
+                top: top + 'px',
+                left: left + 'px',
+                width: size + 'px',
+                height: 'auto' // Используем 'auto' для сохранения пропорций
+            };
+        }
+
+        // Функция для добавления изображения на страницу
+        function addImage() {
+            var image = getRandomImage();
+            var styles = getRandomStyles();
+
+            // Создаем элемент изображения и применяем стили
+            var $img = $('<img>').attr('src', image.path).css(styles);
+
+            // Добавляем изображение в контейнер на странице
+            $('.container').append($img);
+        }
+
+        // Добавляем случайное количество изображений на страницу
+        var numberOfImages = 100; // Задаем количество изображений
+        for (var i = 0; i < numberOfImages; i++) {
+            addImage();
+        }
+
+        function setTheme(theme) {
+        currentTheme = theme;
+        const themeColors = getThemeColors(currentTheme);
+
+        document.body.style.backgroundColor = themeColors.background;
+        document.body.style.color = themeColors.text;
+
+        const buttons = document.querySelectorAll('.btn');
+        buttons.forEach(button => {
+            button.style.backgroundColor = themeColors.button;
+            button.style.color = themeColors.text;
+        });
+
+        const navLinks = document.querySelectorAll('.nav-link');
+        navLinks.forEach(link => {
+            link.style.color = themeColors.text;
+        });
+
+        const formBlock = document.querySelector('#messForm');
+        if (formBlock) {
+            formBlock.style.backgroundColor = themeColors.formBackground;
+            formBlock.style.border = `2px solid ${themeColors.formBorder}`;
+            formBlock.style.borderRadius = '8px';
+            formBlock.style.padding = '15px';
+            formBlock.style.marginBottom = '20px';
+        }
+
+        const messagesBlock = document.querySelector('#all_mess');
+        if (messagesBlock) {
+            messagesBlock.style.backgroundColor = themeColors.messagesBackground;
+            messagesBlock.style.border = `2px solid ${themeColors.messagesBorder}`;
+            messagesBlock.style.borderRadius = '8px';
+            messagesBlock.style.padding = '15px';
+            messagesBlock.style.marginBottom = '20px';
+        }
+
+        const inputFields = document.querySelectorAll('.form-control');
+        inputFields.forEach(input => {
+            input.style.backgroundColor = themeColors.background;
+            input.style.color = themeColors.text;
+            input.style.border = `1px solid ${themeColors.inputBorder}`;
+            input.style.borderRadius = '5px';
+        });
+    }
+
+    function getThemeColors(theme) {
+        switch (theme) {
+            case 'dark':
+                return {
+                    background: '#1D1D1D',
+                    text: '#CCCCCC',
+                    button: '#333333',
+                    formBackground: '#2A2A2A',
+                    formBorder: '#3A3A3A',
+                    messagesBackground: '#2A2A2A',
+                    messagesBorder: '#3A3A3A',
+                    inputBorder: '#3A3A3A'
+                };
+            case 'light':
+                return {
+                    background: '#CCCCCC',
+                    text: '#555555',
+                    button: '#BDB76B',
+                    formBackground: '#BBBBBB',
+                    formBorder: '#AAAAAA',
+                    messagesBackground: '#BBBBBB',
+                    messagesBorder: '#AAAAAA',
+                    inputBorder: '#AAAAAA'
+                };
+            default:
+                return {
+                    background: '#1D1D1D',
+                    text: '#CCCCCC',
+                    button: '#333333',
+                    formBackground: '#2A2A2A',
+                    formBorder: '#3A3A3A',
+                    messagesBackground: '#2A2A2A',
+                    messagesBorder: '#3A3A3A',
+                    inputBorder: '#3A3A3A'
+                };
+        }
+    }
+
+    document.getElementById('toggleThemeButton').addEventListener('click', toggleTheme);
+
+    function toggleTheme() {
+        if (currentTheme === 'dark') {
+            setTheme('light');
+        } else {
+            setTheme('dark');
+        }
+    }
+
+    var min = 1;
+    var max = 6;
+    var random = Math.floor(Math.random() * (max - min)) + min;
+
+    var alertClass;
+    switch (random) {
+        case 1:
+            alertClass = 'secondary';
+            break;
+        case 2:
+            alertClass = 'danger';
+            break;
+        case 3:
+            alertClass = 'success';
+            break;
+        case 4:
+            alertClass = 'warning';
+            break;
+        case 5:
+            alertClass = 'info';
+            break;
+        case 6:
+            alertClass = 'light';
+            break;
+    }
+
+    $(function () {
+        var socket = io.connect();
+        var $form = $("#messForm");
+        var $name = $("#name");
+        var $textarea = $("#message");
+        var $all_messages = $("#all_mess");
+
+        $form.submit(function (event) {
+            event.preventDefault();
+            if ($name.val().trim() === '' || $textarea.val().trim() === '') {
+                alert('Введите имя и сообщение!');
+                return;
+            }
+
+            socket.emit('send mess', { mess: $textarea.val(), name: $name.val(), className: alertClass });
+            $textarea.val('');
+        });
+
+        socket.on('add mess', function (data) {
+            $all_messages.append("<div class='alert alert-" + data.className + "'><b>" + data.name + "</b>: " + data.mess + "</div>");
+        });
+
+        socket.on('update users', function (data) {
+            document.getElementById('userCount').innerText = data.count;
+        });
+    });
+    </script>
+</body>
+</html>
